@@ -4,6 +4,17 @@ Enable web access in the composer's Extras menu for a chat, or in Settings → W
 
 The model uses the existing `web_search` and `web_fetch` tools. Search returns numbered titles, direct URLs, snippets, source names and a retrieval timestamp. The model can read a page with `web_fetch` and cite its URL. Results and pages are treated as untrusted data in the web prompt.
 
+## Codex native search
+
+With **Use Codex’s native web search** selected in Settings → Codex, the model
+prefers Codex’s native live search. Deep Pink also supplies its `web_search`
+and `web_fetch` tools so the model can recover when native search fails or is
+unavailable. Fallback searches use Deep Pink’s search backend and send queries
+from your device to search engines (or your configured SearXNG instance), as
+described below. This does not enable OpenRouter’s billed plugin for Codex.
+Web access must be enabled for the chat; disabling its web or tools prompt
+segment in native mode disables both native search and the fallback tools.
+
 ## Quality and speed
 
 Brave and DuckDuckGo start together. Bing starts if either fails or there are too few usable results, or after 700 ms if the initial sources are slow. The service keeps each engine's ranking and uses reciprocal rank fusion to promote URLs found by multiple sources. Duplicate results, advertising blocks, search navigation, unsafe URLs and blocked domains are excluded. Search redirectors and common tracking parameters are removed from source URLs.

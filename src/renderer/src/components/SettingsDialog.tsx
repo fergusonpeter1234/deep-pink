@@ -2087,6 +2087,10 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
               />
               <span>Use Codex’s native web search</span>
             </label>
+            <p className="field__hint">
+              Uses Codex first, with Deep Pink’s search and page reading as a fallback if native
+              search fails or is unavailable. Web access must be enabled for the chat.
+            </p>
           </SettingsSection>
 
           <SettingsSection

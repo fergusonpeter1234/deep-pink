@@ -31,7 +31,7 @@ export interface ChatRequest {
   attribution: boolean
   signal?: AbortSignal
   webPlugin?: boolean
-  /** Allow only Codex's native web search and page-reading tool. */
+  /** Prefer Codex's native web search, with client web tools as a fallback. */
   nativeWebSearch?: boolean
   modalities?: string[]
 }
