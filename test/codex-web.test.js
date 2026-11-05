@@ -6,18 +6,17 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-suite('Codex web search recovery', async ({ check, subject }) => {
+suite('Codex web tool runtime', async ({ check, subject }) => {
   const { assembleContext, streamCodexChat, DEFAULT_SETTINGS, WEB_SEARCH_TOOL } = subject
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.codex.nativeWebSearch = true
   settings.web.enabled = true
   const thread = { config: { model: 'codex:test-model', webAccessEnabled: true } }
   const context = assembleContext(thread, settings, 'codex')
-  check('native mode keeps both client web tools available for recovery',
-    context.codexNativeWebSearch &&
-    context.tools.map((t) => t.function.name).join(',') === 'web_search,web_fetch')
-  check('native instructions explain when to use fallback tools',
-    context.systemText.includes('If native search is unavailable or fails'))
+  check('native mode keeps the native search preference',
+    context.codexNativeWebSearch && context.tools.length === 0)
+  check('native instructions permit the required JavaScript wrapper',
+    context.systemText.includes('code-mode JavaScript wrapper'))
 
   for (const config of [
     { webAccessEnabled: false },
@@ -25,7 +24,7 @@ suite('Codex web search recovery', async ({ check, subject }) => {
     { disabledPromptSegments: ['tools'] }
   ]) {
     const disabled = assembleContext({ config: { ...thread.config, ...config } }, settings, 'codex')
-    check(`web controls disable native and fallback access: ${JSON.stringify(config)}`,
+    check(`web controls disable native and client web access: ${JSON.stringify(config)}`,
       !disabled.codexNativeWebSearch && disabled.tools.length === 0)
   }
 
@@ -39,11 +38,13 @@ suite('Codex web search recovery', async ({ check, subject }) => {
   process.env.PATH = binDir
   try {
     for (const scenario of [
-      { native: true, namespace: 'codex_app', tool: 'web_search', allowed: true },
+      { native: true, namespace: null, tool: null, allowed: false },
+      { native: false, namespace: 'codex_app', tool: 'web_search', allowed: true },
+      { native: false, namespace: null, tool: null, allowed: false },
       { native: false, namespace: null, tool: 'web_search', allowed: true },
       { native: false, namespace: '', tool: 'web_search', allowed: true },
-      { native: true, namespace: 'unrelated', tool: 'web_search', allowed: false },
-      { native: true, namespace: 'codex_app', tool: 'shell', allowed: false }
+      { native: false, namespace: 'unrelated', tool: 'web_search', allowed: false },
+      { native: false, namespace: 'codex_app', tool: 'shell', allowed: false }
     ]) {
       let threadParams
       let launchArgs
@@ -73,6 +74,10 @@ suite('Codex web search recovery', async ({ check, subject }) => {
                 emit({ id: message.id, result: { thread: { id: 'test-thread' } } })
               } else if (message.method === 'turn/start') {
                 emit({ id: message.id, result: {} })
+                if (!scenario.tool) {
+                  emit({ method: 'turn/completed', params: { turn: { status: 'completed' } } })
+                  return
+                }
                 emit({ id: 900, method: 'item/tool/call', params: {
                   threadId: 'test-thread', turnId: 'test-turn', callId: 'search-call',
                   namespace: scenario.namespace, tool: scenario.tool,
@@ -94,7 +99,7 @@ suite('Codex web search recovery', async ({ check, subject }) => {
       }
       const result = await streamCodexChat({
         model: 'codex:test-model', messages: [{ role: 'user', content: 'Search current release notes.' }],
-        nativeWebSearch: scenario.native, tools: [WEB_SEARCH_TOOL], attribution: false
+        nativeWebSearch: scenario.native, tools: scenario.tool ? [WEB_SEARCH_TOOL] : [], attribution: false
       }, {
         onDynamicToolCall: async (call) => {
           handled += 1
@@ -104,15 +109,23 @@ suite('Codex web search recovery', async ({ check, subject }) => {
       check(`tool authorization: ${JSON.stringify(scenario)}`,
         scenario.allowed
           ? handled === 1 && reply.result?.success === true && result.toolCalls.length === 1
-          : handled === 0 && Boolean(reply.error) && result.toolCalls.length === 0,
+          : handled === 0 && (!scenario.tool || Boolean(reply.error)) && result.toolCalls.length === 0,
         { handled, reply })
+      const enabled = (feature) => launchArgs[launchArgs.indexOf(feature) - 1] === '--enable'
+      const disabled = (feature) => launchArgs[launchArgs.indexOf(feature) - 1] === '--disable'
+      const webEnabled = scenario.native || Boolean(scenario.tool)
+      check('web access controls the required tool runtime', webEnabled
+        ? enabled('code_mode') && enabled('code_mode_host') && !launchArgs.includes('code_mode_only')
+        : disabled('code_mode') && disabled('code_mode_host') && disabled('code_mode_only'))
+      check('tool runtime preserves the shell, computer, plugin and MCP restrictions',
+        ['shell_tool', 'unified_exec', 'browser_use', 'computer_use', 'plugins', 'apps'].every(disabled) &&
+        launchArgs.includes('mcp_servers={}'))
       if (scenario.native) {
-        check('native preference preserves live search while registering fallback',
-          launchArgs.includes('web_search="live"') &&
-          launchArgs[launchArgs.indexOf('standalone_web_search') - 1] === '--enable')
-        check('native turn registers the fallback tool and recovery instructions',
-          threadParams.dynamicTools.some((t) => t.name === 'web_search') &&
-          threadParams.developerInstructions.includes('If native search is unavailable or fails'))
+        check('native option keeps standalone live search enabled',
+          launchArgs.includes('web_search="live"') && enabled('standalone_web_search'))
+        check('native turn allows the wrapper without registering fallback tools',
+          !threadParams.dynamicTools &&
+          threadParams.developerInstructions.includes('code-mode JavaScript wrapper'))
       }
     }
   } finally {
