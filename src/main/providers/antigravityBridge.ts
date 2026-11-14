@@ -1,12 +1,13 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { ToolCall, ToolResult } from '@shared/types'
+import { antigravityWebCallLimit, MAX_ANTIGRAVITY_WEB_CALLS } from '@shared/antigravity'
 import { WEB_FETCH_TOOL, WEB_SEARCH_TOOL } from '../tools/web'
 import type { ToolParam } from './types'
 
 export const WEB_SERVER_NAME = 'deep_pink_web'
 // Match the chat engine's limit; tell the agent before it attempts another call.
-export const MAX_ANTIGRAVITY_WEB_CALLS = 12
+export { MAX_ANTIGRAVITY_WEB_CALLS }
 
 /** Google adds a display-only toolSummary argument to eager MCP calls. */
 export function webArguments(name: string, value: unknown): Record<string, unknown> {
@@ -76,8 +77,10 @@ createInterface({ input: process.stdin }).on('line', line => {
 export async function createWebBridge(
   tools: ToolParam[],
   handle: (call: ToolCall) => Promise<ToolResult>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  webToolLimit = MAX_ANTIGRAVITY_WEB_CALLS
 ): Promise<{ endpoint: string; token: string; close: () => Promise<void> }> {
+  const maxCalls = antigravityWebCallLimit(webToolLimit)
   const token = randomBytes(32).toString('hex')
   const path = `/${randomUUID()}`
   const allowed = new Set(webToolsFor(tools).map((tool) => tool.function.name))
@@ -112,16 +115,16 @@ export async function createWebBridge(
           const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { name?: unknown; arguments?: unknown }
           if (typeof input.name !== 'string' || !allowed.has(input.name)) throw new Error('Web tool is not enabled.')
           const args = webArguments(input.name, input.arguments)
-          if (requests >= MAX_ANTIGRAVITY_WEB_CALLS) {
+          if (requests >= maxCalls) {
             throw new Error('Deep Pink’s web-tool budget for this reply is exhausted. Finish the answer using the results already collected; do not call another tool.')
           }
           requests++
           const result = await handle({ id: `antigravity-web-${randomUUID()}`, name: input.name, arguments: JSON.stringify(args) })
-          const remaining = MAX_ANTIGRAVITY_WEB_CALLS - requests
+          const remaining = maxCalls - requests
           const budget = remaining === 0
             ? '\n\n[Deep Pink: The web-tool budget is exhausted. Finish the answer using the results already collected. Do not call another tool.]'
-            : remaining <= 2
-              ? `\n\n[Deep Pink: ${remaining} web-tool calls remain for this reply. Finish with the information already collected when the budget runs out.]`
+            : remaining > 0
+              ? `\n\n[Deep Pink: ${remaining} web-tool ${remaining === 1 ? 'call remains' : 'calls remain'}. This is a ceiling, not a target. Answer now if the evidence is sufficient; use another call only for a material gap. Finish with the information already collected when the budget runs out.]`
               : ''
           reply(200, { content: [{ type: 'text', text: result.content + budget }], isError: result.isError })
         } catch (error) {

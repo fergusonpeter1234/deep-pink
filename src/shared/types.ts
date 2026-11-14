@@ -768,6 +768,8 @@ export type SettingsPatch = Omit<
 export interface AntigravitySettings {
   enabled: boolean
   hideChatNotice: boolean
+  /** Total searches and page reads allowed per reply, independently of thinking effort. */
+  webToolLimit: number
 }
 
 export interface CodexSettings {

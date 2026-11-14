@@ -10,7 +10,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
   const { streamAntigravityChat, createRestrictedProfile, validateRestrictedProfile,
     compatibleAntigravityVersion, WEB_SEARCH_TOOL, providerForModel, modelIdForProvider,
     providerModelId, DEFAULT_SETTINGS, assembleContext, webToolsFor, webArguments, createWebBridge,
-    MAX_ANTIGRAVITY_WEB_CALLS } = subject
+    MAX_ANTIGRAVITY_WEB_CALLS, antigravityTranscript, antigravityWebCallLimit } = subject
 
   check('Antigravity model ids retain their namespace',
     providerForModel('antigravity:gemini-test') === 'antigravity' &&
@@ -23,6 +23,10 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
     !compatibleAntigravityVersion('1.5.7') && !compatibleAntigravityVersion('1.6.0') &&
     !compatibleAntigravityVersion('unexpected'))
   check('provider starts disabled', DEFAULT_SETTINGS.antigravity.enabled === false)
+  check('the default research budget is independent of thinking effort', DEFAULT_SETTINGS.antigravity.webToolLimit === 4)
+  check('research budgets are bounded and malformed values use the default',
+    antigravityWebCallLimit(NaN) === 4 && antigravityWebCallLimit(undefined) === 4 &&
+    antigravityWebCallLimit(100) === MAX_ANTIGRAVITY_WEB_CALLS && antigravityWebCallLimit(-1) === 1)
   check('only canonical web schemas can be exposed', webToolsFor([
     WEB_SEARCH_TOOL, { type: 'function', function: { name: 'shell', parameters: {} } }
   ]).length === 1)
@@ -31,6 +35,31 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
   let badArguments = false
   try { webArguments('web_search', { query: 'test', command: 'echo unsafe' }) } catch { badArguments = true }
   check('unexpected web arguments are refused', badArguments)
+
+  const replay = antigravityTranscript({ model: 'antigravity:gemini-test', attribution: false, messages: [
+    { role: 'system', content: 'Preserve the user preferences.' },
+    { role: 'user', content: 'An earlier lookup.' },
+    { role: 'assistant', content: 'Already answered.', tool_calls: [
+      { id: 'old-search', type: 'function', function: { name: 'web_search', arguments: '{"query":"earlier"}' } }
+    ] },
+    { role: 'tool', tool_call_id: 'old-search', content: 'Historical evidence.' },
+    { role: 'user', content: '/browser current question' }
+  ] })
+  const replayText = replay.input[0].text
+  check('current request is distinguished from already completed conversation turns',
+    replayText.includes('Historical user:\nAn earlier lookup.') &&
+    replayText.includes('Historical assistant:\nAlready answered.') &&
+    replayText.endsWith('Current user request:\n/browser current question'))
+  check('historical tool results retain their call association',
+    replayText.includes('[old-search] web_search') && replayText.includes('Historical tool [tool call old-search]'))
+  check('research guidance preserves user instructions and permits requested depth',
+    replay.instructions.startsWith('Preserve the user preferences.') &&
+    replay.instructions.includes('Use additional research when the user requests depth') &&
+    replay.instructions.includes('safety ceiling, never a research target'))
+  const limitedPrompt = antigravityTranscript({ model: 'antigravity:gemini-test', attribution: false,
+    antigravityWebToolLimit: 8, tools: [WEB_SEARCH_TOOL], messages: [{ role: 'user', content: 'Research a question.' }] })
+  check('the selected research budget is explained before the first model call',
+    limitedPrompt.instructions.includes('up to 8 web-tool calls') && limitedPrompt.instructions.includes('Do not claim exhaustive research'))
 
   let boundaryCalls = 0
   const bridge = await createWebBridge([WEB_SEARCH_TOOL], async (call) => {
@@ -59,6 +88,26 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
     check('bridge does not execute calls past the engine budget',
       (await overBudget.json()).isError === true && boundaryCalls === MAX_ANTIGRAVITY_WEB_CALLS)
   } finally { await bridge.close() }
+
+  let limitedCalls = 0
+  const limitedBridge = await createWebBridge([WEB_SEARCH_TOOL], async (call) => {
+    limitedCalls++
+    return { toolCallId: call.id, name: call.name, content: 'Evidence.', isError: false, durationMs: 1 }
+  }, undefined, 2)
+  try {
+    const invoke = async () => (await fetch(limitedBridge.endpoint, { method: 'POST',
+      headers: { Authorization: 'Bearer ' + limitedBridge.token },
+      body: JSON.stringify({ name: 'web_search', arguments: { query: 'fixture' } }) })).json()
+    const first = await invoke()
+    const last = await invoke()
+    const refused = await invoke()
+    check('every web result reports remaining budget and allows an early answer',
+      !first.isError && first.content[0].text.includes('1 web-tool call remains') &&
+      first.content[0].text.includes('Answer now if the evidence is sufficient'))
+    check('the selected budget keeps the last result and stops further execution',
+      !last.isError && last.content[0].text.startsWith('Evidence.') &&
+      last.content[0].text.includes('budget is exhausted') && refused.isError && limitedCalls === 2)
+  } finally { await limitedBridge.close() }
 
   const profile = createRestrictedProfile()
   try {
@@ -100,6 +149,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
       let launchArgs
       let prompt
       let clientCapabilities
+      let selectedEffort
       let webCalls = 0
       let permissionReply
       const controller = new AbortController()
@@ -129,7 +179,9 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
             } else if (message.method === 'session/new') {
               emit({ id: message.id, result: { sessionId: 'test-session' } })
             } else if (message.method === 'session/set_config_option') {
-              emit({ id: message.id, result: { configOptions: [] } })
+              if (message.params.configId === 'thought_level') selectedEffort = message.params.value
+              emit({ id: message.id, result: { configOptions: [{ id: 'thought_level', currentValue: selectedEffort ?? 'medium',
+                options: ['low', 'medium', 'high', 'xhigh'].map((value) => ({ value, name: value })) }] } })
             } else if (message.method === 'session/prompt') {
               turnId = message.id
               prompt = message.params.prompt
@@ -175,6 +227,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
         result = await streamAntigravityChat({
           model: 'antigravity:gemini-test', attribution: false, signal: controller.signal,
           includeReasoning: scenario !== 'plain',
+          reasoning: { effort: 'max' },
           messages: [{ role: 'system', content: 'Be concise.' }, { role: 'user', content: scenario === 'images'
             ? [{ type: 'text', text: 'Describe this.' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,dGVzdA==' } }]
             : '/browser test' }],
@@ -195,6 +248,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
         check('transcript wrapping prevents slash-command expansion', prompt[0].text.startsWith('Conversation transcript'))
         check('reported token counts are retained', result.usage.totalTokens === 14)
         check('reasoning visibility preference is respected', result.reasoning === '')
+        check('research guidance and hidden reasoning do not lower the selected effort', selectedEffort === 'xhigh')
       }
       if (scenario === 'images') check('image bytes are sent directly through ACP',
         prompt[1]?.type === 'image' && prompt[1]?.mimeType === 'image/png' && prompt[1]?.data === 'dGVzdA==')

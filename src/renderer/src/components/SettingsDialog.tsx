@@ -2111,6 +2111,24 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
                 onChange={(event) => void saveSettings({ antigravity: { enabled: event.target.checked } })} />
               <span>Enable the Antigravity provider</span>
             </label>
+            <div className="field">
+              <FieldLabel path="antigravity.webToolLimit" what="the Antigravity web research budget">
+                Web research budget per reply
+              </FieldLabel>
+              <select id="setting-antigravity-webToolLimit" value={settings.antigravity.webToolLimit}
+                onChange={(event) => void saveSettings({ antigravity: { webToolLimit: Number(event.target.value) } })}>
+                {![4, 8, 12].includes(settings.antigravity.webToolLimit) && (
+                  <option value={settings.antigravity.webToolLimit}>{settings.antigravity.webToolLimit} searches or page reads</option>
+                )}
+                <option value={4}>4 searches or page reads — shorter research</option>
+                <option value={8}>8 searches or page reads — more research</option>
+                <option value={12}>12 searches or page reads — extended research</option>
+              </select>
+              <p className="field__hint">
+                More web calls can substantially increase response time. Increase this for research
+                that needs more sources. Thinking effort is controlled separately in the chat composer.
+              </p>
+            </div>
             <label className="switch">
               <input type="checkbox" checked={!settings.antigravity.hideChatNotice}
                 onChange={(event) => void saveSettings({ antigravity: { hideChatNotice: !event.target.checked } })} />

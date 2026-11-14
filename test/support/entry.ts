@@ -11,6 +11,7 @@ export { DEFAULT_SETTINGS } from '@shared/defaults'
 export { WEB_SEARCH_TOOL } from '@/tools/web'
 export {
   streamChat as streamAntigravityChat,
+  transcript as antigravityTranscript,
   compatibleVersion as compatibleAntigravityVersion,
   createRestrictedProfile,
   validateRestrictedProfile,
@@ -18,6 +19,7 @@ export {
 } from '@/providers/antigravity'
 export { createWebBridge, MAX_ANTIGRAVITY_WEB_CALLS, WEB_BRIDGE_SCRIPT, webArguments, webToolsFor } from '@/providers/antigravityBridge'
 export { providerForModel, modelIdForProvider, providerModelId } from '@shared/modelProviders'
+export { antigravityWebCallLimit } from '@shared/antigravity'
 export { linkContextMenuItems, registerLinkContextMenu } from '@/linkContextMenu'
 export * as codex from '@/providers/codex'
 export { liftProviderTools } from '../../src/renderer/src/turns'

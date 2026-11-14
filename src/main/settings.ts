@@ -1,5 +1,6 @@
 import { DEFAULT_KEYBINDS, DEFAULT_SETTINGS } from '@shared/defaults'
 import { normalizeCompaction } from '@shared/compaction'
+import { antigravityWebCallLimit } from '@shared/antigravity'
 import type { Settings, SettingsPatch } from '@shared/types'
 import { getSetting, setSetting } from './db/repo'
 import { hasApiKey } from './secrets'
@@ -90,7 +91,8 @@ export function loadSettings(): Settings {
     },
     antigravity: {
       ...DEFAULT_SETTINGS.antigravity,
-      ...stored.antigravity
+      ...stored.antigravity,
+      webToolLimit: antigravityWebCallLimit(stored.antigravity?.webToolLimit)
     },
     webServer: webServerSettings(stored.webServer),
     compaction: normalizeCompaction(stored.compaction ?? {}),
@@ -135,7 +137,8 @@ export function saveSettings(input: SettingsPatch): Settings {
     },
     antigravity: {
       ...current.antigravity,
-      ...patch.antigravity
+      ...patch.antigravity,
+      webToolLimit: antigravityWebCallLimit(patch.antigravity?.webToolLimit ?? current.antigravity.webToolLimit)
     },
     webServer: webServerSettings({ ...current.webServer, ...patch.webServer }),
     compaction: normalizeCompaction({

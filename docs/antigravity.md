@@ -14,6 +14,8 @@ The Electron main process launches `agy acp` and communicates over standard inpu
 
 Each request supplies the Deep Pink conversation as a transcript, passes system instructions through Antigravity's custom system-instruction support, and sends image attachments as ACP image content. Transcript wrapping prevents a user message beginning with a slash command from becoming a CLI command. Model choice and reasoning effort use ACP session options. Responses, reasoning, context-window information and reported token counts are translated into Deep Pink events.
 
+The transcript distinguishes the current user request from historical messages and associates earlier tool results with their calls. The restricted custom agent includes chat-oriented guidance: use research proportional to the question, finish when the evidence is sufficient, and state uncertainty instead of repeatedly searching to prove a negative. Detailed research requests can still use the configured web budget.
+
 The provider does not offer temperature or maximum-output-token controls. Antigravity manages them. It does not report a monetary cost, so Deep Pink omits the per-reply cost chip for this provider. A zero in stored usage is not a claim that the subscription is free.
 
 ## Restrictions
@@ -32,7 +34,9 @@ When Web access is on, Deep Pink creates a private stdio MCP helper with only `w
 
 Only matching web-tool permission requests can receive an `allow_once` response. No general command, file, browser or personal MCP permission is granted. Native Antigravity search/page tools are not used.
 
-Each reply has the chat engine's 12-call web budget. The bridge warns when two calls remain and tells the agent to finish after the last allowed result. Search-provider outages, empty results, page HTTP errors, and exhausted tool budgets are different failure cases; a failed search does not mean earlier searches failed or that no matching pages exist.
+Each reply defaults to four combined searches/page reads. Settings → Antigravity → Web research budget offers four, eight or twelve calls; twelve is the chat engine's hard ceiling. The selected budget is sent before generation, each result reports the remaining calls, and the last allowed result tells the agent to finish. Increase the budget when a question needs more sources; reaching the limit may leave an answer less thoroughly researched, which the agent is instructed to disclose. This setting does not reduce reasoning effort. Search-provider outages, empty results, page HTTP errors, and exhausted tool budgets are different failure cases; a failed search does not mean earlier searches failed or that no matching pages exist.
+
+Startup and search transport are only part of response time. An isolated CLI replay of a short research request took about 103 seconds with twelve web calls, while session startup took under two seconds. Two replays with the revised guidance and default four-call budget took about 70 and 81 seconds at the same model and reasoning setting. This is a small sample with variable source responses and server load, using Node fetch for the app web transport; it is not a GUI benchmark. A separate control with plain system instructions timed out, so it did not establish customization instructions as a cause. These controls are a latency/coverage tradeoff and a partial mitigation, not a fix for the full gap with the Gemini website or native Antigravity. The CLI's individual model calls and thinking can still take substantial time.
 
 ## Cleanup and validation
 

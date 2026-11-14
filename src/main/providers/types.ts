@@ -28,6 +28,8 @@ export interface ChatRequest {
   providerRouting?: ProviderRouting | null
   includeReasoning?: boolean
   reasoning?: Record<string, unknown> | null
+  /** Antigravity's per-reply search/page-reading budget; independent of reasoning effort. */
+  antigravityWebToolLimit?: number
   attribution: boolean
   signal?: AbortSignal
   webPlugin?: boolean

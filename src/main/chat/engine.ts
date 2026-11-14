@@ -1200,6 +1200,7 @@ export async function sendMessage(req: SendMessageRequest, emit: Emit): Promise<
             tools: context.tools.length ? context.tools : undefined,
             providerRouting: routingForTurn,
             reasoning: reasoningFor(thread, settings, model),
+            antigravityWebToolLimit: provider === 'antigravity' ? settings.antigravity.webToolLimit : undefined,
             includeReasoning: settings.streamReasoning,
             attribution: settings.sendAppAttribution,
             webPlugin:

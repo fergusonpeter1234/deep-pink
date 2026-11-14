@@ -7,6 +7,7 @@ import type {
   WebServerSettings
 } from './types'
 import { DEFAULT_REASONING } from './reasoning'
+import { DEFAULT_ANTIGRAVITY_WEB_CALLS } from './antigravity'
 
 export const DEFAULT_PROVIDER_ROUTING: ProviderRouting = {
   order: [],
@@ -308,7 +309,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Existing Codex selections continue to work; the experimental page offers
   // a switch for people who want to turn the provider off.
   codex: { enabled: true, hideChatNotice: false, nativeWebSearch: false },
-  antigravity: { enabled: false, hideChatNotice: false },
+  antigravity: { enabled: false, hideChatNotice: false, webToolLimit: DEFAULT_ANTIGRAVITY_WEB_CALLS },
   webServer: DEFAULT_WEB_SERVER_SETTINGS,
   compaction: DEFAULT_COMPACTION,
   sendAppAttribution: true,
