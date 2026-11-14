@@ -101,8 +101,8 @@ export class SearchService {
 
   constructor(options: Options = {}) {
     this.options = {
-      now: Date.now, hedgeMs: 700, mergeMs: 250, providerTimeoutMs: 4000,
-      deadlineMs: 6000, freshMs: 120_000, staleMs: 1_800_000, cooldownMs: 30_000,
+      now: Date.now, hedgeMs: 700, mergeMs: 250, providerTimeoutMs: 8000,
+      deadlineMs: 10_000, freshMs: 120_000, staleMs: 1_800_000, cooldownMs: 30_000,
       ...options
     }
   }
@@ -163,7 +163,10 @@ export class SearchService {
     // on every source prevent finding one that has already recovered.
     const queue = available.length ? [...available] : [...request.providers]
       .sort((a, b) => (this.health.get(a.id)?.retryAt ?? 0) - (this.health.get(b.id)?.retryAt ?? 0))
+    const recovery = available.length ? request.providers.filter((p) => !available.includes(p))
+      .sort((a, b) => (this.health.get(a.id)?.retryAt ?? 0) - (this.health.get(b.id)?.retryAt ?? 0)) : []
     const unavailable = new Set(request.providers.filter((p) => !queue.includes(p)).map((p) => p.name))
+    const failureReasons = new Map<string, string>()
 
     return new Promise((resolve, reject) => {
       const controller = new AbortController()
@@ -187,7 +190,8 @@ export class SearchService {
         else reject(new Error(
           'Web search is temporarily unavailable or returned no usable public results. ' +
           'Check your connection or try a different query shortly. ' +
-          `Sources: ${request.providers.map((p) => p.name).join(', ')}. ` +
+          `Sources: ${request.providers.map((p) => `${p.name} (${failureReasons.get(p.name) ??
+            (unavailable.has(p.name) ? 'cooling down' : 'deadline reached')})`).join(', ')}. ` +
           'This does not establish that no matching pages exist.'
         ))
       }
@@ -213,10 +217,16 @@ export class SearchService {
             throw new Error('No usable results (empty response, challenge or changed markup).')
           }
           this.health.delete(provider.id)
+          unavailable.delete(provider.name)
           batches.push({ name: provider.name, results })
-        }).catch(() => {
+        }).catch((error: unknown) => {
           if (done || parent.aborted) return
           unavailable.add(provider.name)
+          const message = error instanceof Error ? error.message : ''
+          const http = /\bHTTP (\d{3})\b/.exec(message)
+          failureReasons.set(provider.name, http ? `HTTP ${http[1]}`
+            : timed.aborted || /timeout|timed out/i.test(message) ? 'timed out'
+              : message.startsWith('No usable results') ? 'no usable results or challenge' : 'request failed')
           const failures = Math.min((this.health.get(provider.id)?.failures ?? 0) + 1, 5)
           this.health.set(provider.id, { failures, retryAt: now() + Math.min(cooldownMs * 2 ** (failures - 1), 300_000) })
           if (this.health.size > 100) this.health.delete(this.health.keys().next().value!)
@@ -228,7 +238,15 @@ export class SearchService {
             if (!active) finished()
             else if (!grace) grace = setTimeout(finished, mergeMs)
           } else if (queue.length) launch()
-          else if (!active) finished()
+          else if (!active) {
+            // A source that was healthy on the previous query must not prevent
+            // recovery probes when it is the only eligible source and now fails.
+            if (!rankResults(batches, request.blockedDomains, request.limit).length && recovery.length) {
+              queue.push(...recovery.splice(0))
+              launch()
+              launch()
+            } else finished()
+          }
         })
       }
       if (parent.aborted) { finished(); return }

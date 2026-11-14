@@ -72,6 +72,20 @@ export function parseSearchHtml(engine: 'brave' | 'duckduckgo' | 'bing', html: s
   return results.slice(0, 10)
 }
 
+/** Bing's RSS response provides a fallback independent of its HTML layout. */
+export function parseBingRss(xml: string): SearchResult[] {
+  const $ = load(xml, { xmlMode: true })
+  const results: SearchResult[] = []
+  $('rss > channel > item').each((_i, element) => {
+    const item = $(element)
+    const url = resultUrl(item.children('link').text(), 'https://www.bing.com')
+    const title = text(item.children('title').text())
+    if (url && title) results.push({ title, url,
+      snippet: text(load(item.children('description').text()).text()) })
+  })
+  return results.slice(0, 10)
+}
+
 export function builtInProviders(fetchText: SearchFetch): SearchProvider[] {
   return (['brave', 'duckduckgo', 'bing'] as const).map((engine) => ({
     id: engine,
@@ -85,7 +99,19 @@ export function builtInProviders(fetchText: SearchFetch): SearchProvider[] {
         url.searchParams.set('setlang', 'en')
         url.searchParams.set('mkt', 'en-US')
       }
-      return parseSearchHtml(engine, await fetchText(url, signal))
+      if (engine !== 'bing') return parseSearchHtml(engine, await fetchText(url, signal))
+      // Leave time for RSS when the HTML endpoint stalls, challenges or changes
+      // markup. Both requests stay on Bing and share the outer source deadline.
+      try {
+        const htmlSignal = AbortSignal.any([signal, AbortSignal.timeout(3000)])
+        const results = parseSearchHtml(engine, await fetchText(url, htmlSignal))
+        if (results.length) return results
+      } catch {
+        signal.throwIfAborted()
+      }
+      signal.throwIfAborted()
+      url.searchParams.set('format', 'rss')
+      return parseBingRss(await fetchText(url, signal))
     }
   }))
 }
