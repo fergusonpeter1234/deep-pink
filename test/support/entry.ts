@@ -16,7 +16,7 @@ export {
   validateRestrictedProfile,
   RESTRICTED_AGENT
 } from '@/providers/antigravity'
-export { createWebBridge, WEB_BRIDGE_SCRIPT, webArguments, webToolsFor } from '@/providers/antigravityBridge'
+export { createWebBridge, MAX_ANTIGRAVITY_WEB_CALLS, WEB_BRIDGE_SCRIPT, webArguments, webToolsFor } from '@/providers/antigravityBridge'
 export { providerForModel, modelIdForProvider, providerModelId } from '@shared/modelProviders'
 export { linkContextMenuItems, registerLinkContextMenu } from '@/linkContextMenu'
 export * as codex from '@/providers/codex'

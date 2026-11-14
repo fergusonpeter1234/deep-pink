@@ -3,19 +3,26 @@ import {
   Check,
   Search,
   Settings2,
+  SlidersHorizontal,
   Info,
   Database,
   Pause,
   Play,
+  RefreshCw,
   Globe,
+  Highlighter,
   KeyRound,
   Keyboard,
+  Layers,
   Laptop,
+  MessageSquareText,
   Monitor,
   Palette,
   Plus,
+  Sparkles,
   Trash2,
   Cpu,
+  Terminal,
   Undo2,
   X
 } from 'lucide-react'
@@ -25,12 +32,7 @@ import { Overlay } from './Overlay'
 import { Experimental } from './Experimental'
 import { UpdateSettings } from './UpdateSettings'
 import { SettingsSection } from './settings/SettingsSection'
-import {
-  SETTINGS_PAGES,
-  SETTINGS_CATEGORIES,
-  settingsCategory,
-  matchesSettingsQuery
-} from './settings/catalogue'
+import { SETTINGS_PAGES, matchesSettingsQuery } from './settings/catalogue'
 import { KEYBIND_GROUPS, formatBinding } from '../keybinds'
 import { DEFAULT_KEYBINDS, DEFAULT_SETTINGS } from '@shared/defaults'
 import { formatRelative, modelShortName } from '../format'
@@ -53,12 +55,14 @@ interface TabDef {
   id: Tab
   label: string
   icon: ReactNode
+  /** Newer than the rest, and saying so. See `Experimental`. */
+  experimental?: boolean
 }
 
 const pageTab = (id: Tab, icon: ReactNode): TabDef => ({
   id,
   icon,
-  ...SETTINGS_CATEGORIES[settingsCategory(id)]
+  ...SETTINGS_PAGES[id]
 })
 
 const TAB_GROUPS: { title?: string; tabs: TabDef[] }[] = [
@@ -66,18 +70,37 @@ const TAB_GROUPS: { title?: string; tabs: TabDef[] }[] = [
     title: 'Preferences',
     tabs: [
       pageTab('general', <Settings2 {...ICON} />),
-      pageTab('appearance', <Palette {...ICON} />),
       pageTab('models', <Cpu {...ICON} />),
+      pageTab('appearance', <Palette {...ICON} />),
       pageTab('keys', <Keyboard {...ICON} />)
     ]
   },
   {
-    title: 'App',
+    title: 'Account & app',
     tabs: [
       pageTab('account', <KeyRound {...ICON} />),
-      pageTab('web', <Globe {...ICON} />),
       pageTab('data', <Database {...ICON} />),
       pageTab('about', <Info {...ICON} />)
+    ]
+  },
+  {
+    title: 'Advanced',
+    tabs: [
+      pageTab('prompts', <MessageSquareText {...ICON} />),
+      pageTab('context', <Layers {...ICON} />),
+      pageTab('advanced', <SlidersHorizontal {...ICON} />),
+      pageTab('web', <Globe {...ICON} />)
+    ]
+  },
+  {
+    title: 'Experimental',
+    tabs: [
+      pageTab('codex', <Terminal {...ICON} />),
+      pageTab('antigravity', <Terminal {...ICON} />),
+      pageTab('webServer', <Globe {...ICON} />),
+      pageTab('skills', <Sparkles {...ICON} />),
+      pageTab('keyPoint', <Highlighter {...ICON} />),
+      pageTab('sync', <RefreshCw {...ICON} />)
     ]
   }
 ]
@@ -408,7 +431,8 @@ function SkillsTab({
         </select>
       </div>
       <p className="field__hint">
-        On-demand loading works with both OpenRouter and Codex.
+        On-demand loading works with OpenRouter and Codex. Antigravity includes enabled skill
+        instructions with every request.
       </p>
 
       <div className="section-title">Built in</div>
@@ -546,9 +570,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
     (settings?.hideExperimental ?? true) &&
     asked !== 'codex' &&
     asked !== 'antigravity' &&
-    SETTINGS_PAGES[asked].experimental
+    TAB_GROUPS.some((g) => g.tabs.some((t) => t.id === asked && t.experimental))
   const tab: Tab = hidden ? 'general' : asked
-  const category = settingsCategory(tab)
   const [query, setQuery] = useState('')
   const searching = Boolean(query.trim())
   const [resultCount, setResultCount] = useState(0)
@@ -709,7 +732,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
               autoFocus
               type="search"
               aria-label="Search settings"
-              placeholder="Find a setting…"
+              placeholder="Search settings…"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -735,34 +758,51 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
     >
       <div className="settings-split settings-workspace">
         <nav className="tabs" aria-label="Settings sections">
-          {TAB_GROUPS.map((group) => (
-            <div className="tabs__group" key={group.title}>
-              <div className="tabs__label">{group.title}</div>
-              {group.tabs.map((entry) => (
-                <button
-                  key={entry.id}
-                  className="tab"
-                  data-active={!searching && category === entry.id}
-                  onClick={() => {
-                    setQuery('')
-                    setTab(entry.id)
-                  }}
-                  title={entry.label}
-                  aria-current={!searching && category === entry.id ? 'page' : undefined}
-                  type="button"
-                >
-                  {entry.icon}
-                  <span className="tab__label">{entry.label}</span>
-                </button>
-              ))}
-            </div>
-          ))}
+          {/*
+           * Hidden means gone from the list, not greyed out in it. A row you
+           * cannot choose is still a row you read, and the point of the
+           * switch is an app with fewer rows.
+           */}
+          {TAB_GROUPS.map((group) => ({
+            ...group,
+            tabs: group.tabs.filter((t) => !t.experimental || !settings.hideExperimental)
+          }))
+            .filter((group) => group.tabs.length > 0)
+            .map((group, index) => (
+              <div className="tabs__group" key={group.title ?? `group-${index}`}>
+                {group.title && <div className="tabs__label">{group.title}</div>}
+                {group.tabs.map((entry) => (
+                  <button
+                    key={entry.id}
+                    className="tab"
+                    data-active={!searching && tab === entry.id}
+                    onClick={() => {
+                      setQuery('')
+                      setTab(entry.id)
+                    }}
+                    title={entry.experimental ? `${entry.label} — experimental` : entry.label}
+                    aria-label={entry.experimental ? `${entry.label}, experimental` : entry.label}
+                    aria-current={!searching && tab === entry.id ? 'page' : undefined}
+                    type="button"
+                  >
+                    {entry.icon}
+                    <span className="tab__label">{entry.label}</span>
+                    {/* A mark rather than the word: the word does not fit beside
+                      the longer labels, and a row of tags down a list of
+                      eleven would be a column of its own. What it says is on
+                      the button's title, and in full inside the section. */}
+                    {entry.experimental && (
+                      <span className="tab__experimental" aria-hidden="true" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
         </nav>
 
         <div className="panel__body settings-content" ref={contentRef}>
           <div className="settings-page-heading">
-            <h2>{searching ? 'Search results' : SETTINGS_CATEGORIES[category].label}</h2>
-            {!searching && <p>{SETTINGS_CATEGORIES[category].description}</p>}
+            <h2>{searching ? 'Search results' : SETTINGS_PAGES[tab].label}</h2>
             {searching && (
               <p role="status" aria-live="polite">
                 {`${resultCount} ${resultCount === 1 ? 'section' : 'sections'} found`}
@@ -816,7 +856,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
             <h3 className="section-title">Messaging</h3>
             <div className="field">
               <FieldLabel path="ui.pasteAsFileThreshold" what="the paste threshold">
-                Attach pasted text above this many characters
+                Turn a long paste into an attachment
               </FieldLabel>
               <DebouncedInput
                 id="setting-ui-pasteAsFileThreshold"
@@ -833,7 +873,6 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
                   })
                 }
               />
-              <p className="field__hint">Set to 0 to always paste as text.</p>
             </div>
             <label className="switch">
               <input
@@ -845,7 +884,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
                   })
                 }
               />
-              <span>Press Enter to send</span>
+              <span>Enter to Send</span>
               <Revert path="ui.sendOnEnter" what="Enter sending" />
             </label>
             <label className="switch">
@@ -877,7 +916,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
                 checked={!settings.hideExperimental}
                 onChange={(event) => void saveSettings({ hideExperimental: !event.target.checked })}
               />
-              <span>Show experimental features</span>
+              <span>Experimental Features</span>
               <Revert
                 path="hideExperimental"
                 what="experimental features"
@@ -1599,7 +1638,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
             sectionId="settings-data-2"
             keywords=""
           >
+            <h3 className="section-title">Danger zone</h3>
             <div className="field">
+              <span className="field__hint">
+                Every thread, message and usage record. Settings and keys are kept. With sync on,
+                this travels to your other machines.
+              </span>
               <div className="row">
                 <button
                   className="btn btn--danger"

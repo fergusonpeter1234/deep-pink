@@ -3,7 +3,7 @@
 Deep Pink can use Gemini through the locally installed Antigravity CLI and its cached Google sign-in. This is an experimental provider, disabled by default. It does not require an OpenRouter API key.
 
 1. Install Antigravity CLI and sign in by running `agy` in a terminal.
-2. Show experimental features in Deep Pink, then open Settings → Connections → Antigravity.
+2. Show experimental features in Deep Pink, then open Settings → Antigravity.
 3. Enable the provider and refresh the model picker. Select a model labeled Antigravity.
 
 The current integration accepts CLI 1.5.8 and later patches in the 1.5 series. Unknown series are rejected because the tool restrictions have not been verified for them. A newer series needs validation and an integration update before it is accepted. Deep Pink discovers Gemini models and thinking levels from ACP session options; unsupported third-party models are not advertised.
@@ -31,6 +31,8 @@ When Web access is off, the profile contains no MCP servers and no web tools. Di
 When Web access is on, Deep Pink creates a private stdio MCP helper with only `web_search` and `web_fetch`, using its own Node runtime. Definitions are loaded eagerly, so the model does not need a file-reading tool to inspect their schemas. The helper forwards calls to a temporary loopback endpoint authenticated with a random per-request token. The app checks tool names and arguments, rejects browser origins, caps request sizes and tool calls, and executes only the chat engine's guarded web functions. Page fetches retain Deep Pink's public-URL restrictions and domain blocklist.
 
 Only matching web-tool permission requests can receive an `allow_once` response. No general command, file, browser or personal MCP permission is granted. Native Antigravity search/page tools are not used.
+
+Each reply has the chat engine's 12-call web budget. The bridge warns when two calls remain and tells the agent to finish after the last allowed result. Search-provider outages, empty results, page HTTP errors, and exhausted tool budgets are different failure cases; a failed search does not mean earlier searches failed or that no matching pages exist.
 
 ## Cleanup and validation
 

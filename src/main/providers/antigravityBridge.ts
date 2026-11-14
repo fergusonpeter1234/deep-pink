@@ -5,6 +5,8 @@ import { WEB_FETCH_TOOL, WEB_SEARCH_TOOL } from '../tools/web'
 import type { ToolParam } from './types'
 
 export const WEB_SERVER_NAME = 'deep_pink_web'
+// Match the chat engine's limit; tell the agent before it attempts another call.
+export const MAX_ANTIGRAVITY_WEB_CALLS = 12
 
 /** Google adds a display-only toolSummary argument to eager MCP calls. */
 export function webArguments(name: string, value: unknown): Record<string, unknown> {
@@ -110,9 +112,18 @@ export async function createWebBridge(
           const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { name?: unknown; arguments?: unknown }
           if (typeof input.name !== 'string' || !allowed.has(input.name)) throw new Error('Web tool is not enabled.')
           const args = webArguments(input.name, input.arguments)
-          if (++requests > 24) throw new Error('Antigravity reached the web tool limit for this reply.')
+          if (requests >= MAX_ANTIGRAVITY_WEB_CALLS) {
+            throw new Error('Deep Pink’s web-tool budget for this reply is exhausted. Finish the answer using the results already collected; do not call another tool.')
+          }
+          requests++
           const result = await handle({ id: `antigravity-web-${randomUUID()}`, name: input.name, arguments: JSON.stringify(args) })
-          reply(200, { content: [{ type: 'text', text: result.content }], isError: result.isError })
+          const remaining = MAX_ANTIGRAVITY_WEB_CALLS - requests
+          const budget = remaining === 0
+            ? '\n\n[Deep Pink: The web-tool budget is exhausted. Finish the answer using the results already collected. Do not call another tool.]'
+            : remaining <= 2
+              ? `\n\n[Deep Pink: ${remaining} web-tool calls remain for this reply. Finish with the information already collected when the budget runs out.]`
+              : ''
+          reply(200, { content: [{ type: 'text', text: result.content + budget }], isError: result.isError })
         } catch (error) {
           reply(200, { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Web tool failed.' }], isError: true })
         }

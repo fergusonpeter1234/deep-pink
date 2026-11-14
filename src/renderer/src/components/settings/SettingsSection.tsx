@@ -1,14 +1,7 @@
 import { Children, isValidElement, type ReactNode } from 'react'
 import type { SettingsTab } from '../../store'
 import { useStore } from '../../store'
-import { ChevronRight } from 'lucide-react'
-import {
-  SETTINGS_PAGES,
-  SETTINGS_CATEGORIES,
-  SETTINGS_DISCLOSURES,
-  settingsCategory,
-  matchesSettingsQuery
-} from './catalogue'
+import { SETTINGS_PAGES, matchesSettingsQuery } from './catalogue'
 
 /** Index visible labels, never password values or editable prompt contents. */
 function labelText(node: ReactNode): string {
@@ -44,58 +37,21 @@ export function SettingsSection({
 }): React.JSX.Element | null {
   const info = SETTINGS_PAGES[page]
   const hideExperimental = useStore((s) => s.settings?.hideExperimental ?? true)
-  if (info.experimental && hideExperimental && !((page === 'codex' || page === 'antigravity') && activePage === page))
-    return null
+  if (info.experimental && hideExperimental && !((page === 'codex' || page === 'antigravity') && activePage === page)) return null
   const searching = Boolean(query.trim())
-  if (!searching && settingsCategory(page) !== settingsCategory(activePage)) return null
-  const disclosure = SETTINGS_DISCLOSURES[sectionId]
-  const searchableText = [
-    info.label,
-    info.keywords,
-    SETTINGS_CATEGORIES[settingsCategory(page)].label,
-    disclosure?.title,
-    disclosure?.hint,
-    keywords,
-    labelText(children)
-  ].join(' ')
-  if (searching && !matchesSettingsQuery(query, searchableText)) return null
-  const content = Children.toArray(children)
-  const attributes = {
-    className: 'settings-card',
-    id: sectionId,
-    'data-settings-section': true,
-    'data-settings-page': page
-  }
-
-  // Search results expose matching controls immediately. Direct links from chat
-  // also open their destination, including the normally hidden Codex notice.
-  if (disclosure && !searching) {
-    const first = content[0]
-    const hasHeading = isValidElement(first) && first.type === 'h3'
-    return (
-      <details
-        {...attributes}
-        className="settings-card settings-disclosure"
-        key={activePage}
-        open={activePage === page && settingsCategory(page) !== page}
-      >
-        <summary>
-          <ChevronRight size={16} aria-hidden="true" />
-          <span>
-            <span className="settings-disclosure__title">{disclosure.title}</span>
-            <span className="settings-disclosure__hint">{disclosure.hint}</span>
-          </span>
-          {info.experimental && <span className="settings-disclosure__badge">Experimental</span>}
-        </summary>
-        <div className="settings-disclosure__body">{hasHeading ? content.slice(1) : content}</div>
-      </details>
-    )
-  }
+  if (!searching && page !== activePage) return null
+  if (searching && !matchesSettingsQuery(query, `${info.label} ${keywords} ${labelText(children)}`))
+    return null
 
   return (
-    <section {...attributes}>
+    <section
+      className="settings-card"
+      id={sectionId}
+      data-settings-section
+      data-settings-page={page}
+    >
       {searching && <div className="settings-card__category">{info.label}</div>}
-      {content}
+      {Children.toArray(children)}
     </section>
   )
 }

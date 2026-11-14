@@ -9,7 +9,8 @@ const os = require('node:os')
 suite('Antigravity restricted transport', async ({ check, subject }) => {
   const { streamAntigravityChat, createRestrictedProfile, validateRestrictedProfile,
     compatibleAntigravityVersion, WEB_SEARCH_TOOL, providerForModel, modelIdForProvider,
-    providerModelId, DEFAULT_SETTINGS, assembleContext, webToolsFor, webArguments, createWebBridge } = subject
+    providerModelId, DEFAULT_SETTINGS, assembleContext, webToolsFor, webArguments, createWebBridge,
+    MAX_ANTIGRAVITY_WEB_CALLS } = subject
 
   check('Antigravity model ids retain their namespace',
     providerForModel('antigravity:gemini-test') === 'antigravity' &&
@@ -45,6 +46,18 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
     const unsupported = await fetch(bridge.endpoint, { method: 'POST', headers: { Authorization: 'Bearer ' + bridge.token },
       body: JSON.stringify({ name: 'shell', arguments: { command: 'unsafe' } }) })
     check('bridge refuses undeclared tools', (await unsupported.json()).isError === true && boundaryCalls === 0)
+    let last
+    for (let i = 0; i < MAX_ANTIGRAVITY_WEB_CALLS; i++) {
+      const response = await fetch(bridge.endpoint, { method: 'POST', headers: { Authorization: 'Bearer ' + bridge.token },
+        body: JSON.stringify({ name: 'web_search', arguments: { query: 'fixture' } }) })
+      last = await response.json()
+    }
+    check('last allowed web result tells the agent to finish',
+      boundaryCalls === MAX_ANTIGRAVITY_WEB_CALLS && !last.isError && last.content[0].text.includes('budget is exhausted'))
+    const overBudget = await fetch(bridge.endpoint, { method: 'POST', headers: { Authorization: 'Bearer ' + bridge.token },
+      body: JSON.stringify({ name: 'web_search', arguments: { query: 'fixture' } }) })
+    check('bridge does not execute calls past the engine budget',
+      (await overBudget.json()).isError === true && boundaryCalls === MAX_ANTIGRAVITY_WEB_CALLS)
   } finally { await bridge.close() }
 
   const profile = createRestrictedProfile()
