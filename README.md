@@ -1,6 +1,6 @@
 # Deep Pink
 
-A local-first desktop chat client for [OpenRouter](https://openrouter.ai) and Codex. Your threads, statistics and settings live in a SQLite file on your own machine, and the app makes no network request you did not ask for.
+A local-first desktop chat client for [OpenRouter](https://openrouter.ai), Codex and Antigravity. Your threads, statistics and settings live in a SQLite file on your own machine, and the app makes no network request you did not ask for.
 
 MIT licensed. Built with Electron, React and TypeScript. Runs on Linux, macOS and Windows.
 
@@ -11,6 +11,7 @@ MIT licensed. Built with Electron, React and TypeScript. Runs on Linux, macOS an
 **Models and routing**
 
 - Bring your own OpenRouter API key, stored encrypted through your OS keyring.
+- Use Gemini through the locally signed-in Antigravity CLI. Enable the experimental provider in Settings › Antigravity. It requires CLI 1.5.8 or a later 1.5.x release, uses a fresh temporary profile for every request, and supplies an agent with file, shell, computer-control and delegation tools removed. Web access uses a private bridge to Deep Pink's guarded search and page-reading functions. Personal Antigravity MCP servers, plugins and workspace customizations are excluded. Text, image input, reasoning controls and token counts are supported; temperature, output-token limits and billing estimates are unavailable. [Setup and restrictions](docs/antigravity.md).
 - Pick any model from the full OpenRouter catalogue.
 - Use Codex models through the Codex CLI App Server already signed in on this desktop. The experimental provider can be enabled or disabled in Settings › Codex after showing experimental features. Codex turns run in ephemeral App Server threads with the full Deep Pink conversation supplied as context. The Codex process disables shell, local file tools, computer control, MCP, plugins and other agent tools, and runs in a read-only, no-network sandbox. When Web access is enabled, Codex can use either Deep Pink's guarded web search and page reading or Codex's native web search, selected in Settings › Codex. The native-search option enables only web search and page reading. Codex’s isolated JavaScript tool runtime stays available for models that require it to call web tools. Codex models accept text and, when supported by the model, image attachments. Charts, prompt-based skills and key-sentence highlights work with Codex; skills are included in the prompt rather than loaded through a tool. Repository tools, MCP and upstream provider routing remain unavailable.
 - Choose the *specific upstream provider* for a model — pin one outright, set an order of preference, sort by price/throughput/latency, or refuse providers that train on your data. Scope the choice to one thread or to every use of that model.

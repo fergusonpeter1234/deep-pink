@@ -462,12 +462,17 @@ export interface OpenRouterModel {
 
 /** A model offered by one of Deep Pink's registered chat providers. */
 export interface ChatModel extends OpenRouterModel {
-  provider: 'openrouter' | 'codex'
+  provider: 'openrouter' | 'codex' | 'antigravity'
   /** Provider-native reasoning effort names, when they differ from OpenRouter's. */
   reasoningEfforts?: string[]
 }
 
 export interface ProviderStatus {
+  antigravity: {
+    available: boolean
+    enabled: boolean
+    error: string | null
+  }
   codex: {
     available: boolean
     enabled: boolean
@@ -728,6 +733,7 @@ export interface Settings {
   keyPointMany: boolean
   web: WebSearchSettings
   codex: CodexSettings
+  antigravity: AntigravitySettings
   webServer: WebServerSettings
   compaction: CompactionSettings
   /** Sends app name/url to OpenRouter for leaderboard attribution. On by default. */
@@ -742,10 +748,11 @@ export interface Settings {
  */
 export type SettingsPatch = Omit<
   Partial<Settings>,
-  'web' | 'codex' | 'webServer' | 'compaction' | 'ui' | 'defaultProviderRouting'
+  'web' | 'codex' | 'antigravity' | 'webServer' | 'compaction' | 'ui' | 'defaultProviderRouting'
 > & {
   web?: Partial<WebSearchSettings>
   codex?: Partial<CodexSettings>
+  antigravity?: Partial<AntigravitySettings>
   webServer?: Partial<WebServerSettings>
   compaction?: Partial<CompactionSettings>
   /**
@@ -756,6 +763,11 @@ export type SettingsPatch = Omit<
    */
   ui?: Omit<Partial<UiSettings>, 'replyChips'> & { replyChips?: Partial<ReplyChips> }
   defaultProviderRouting?: Partial<ProviderRouting>
+}
+
+export interface AntigravitySettings {
+  enabled: boolean
+  hideChatNotice: boolean
 }
 
 export interface CodexSettings {

@@ -42,7 +42,7 @@ export interface StreamHandlers {
   onCommentary?: (delta: string) => void
   onReasoning?: (delta: string) => void
   onToolCalls?: (calls: ToolCall[]) => void
-  /** Handle a client-owned Codex App Server dynamic tool call. */
+  /** Execute a client-owned web tool for a restricted local CLI provider. */
   onDynamicToolCall?: (call: ToolCall) => Promise<ToolResult>
   /** Report Codex App Server's native web search and page-reading activity. */
   onNativeWebTool?: (call: ToolCall, result?: ToolResult) => void

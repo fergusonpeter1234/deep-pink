@@ -10,6 +10,8 @@ import { shutdownRepoWorker } from './tools/repoService'
 import * as mcp from './mcp/host'
 import { reportUncaught } from './report'
 import * as webServer from './webServer'
+import * as antigravity from './providers/antigravity'
+import { abortThread, generatingThreads } from './chat/engine'
 
 /*
  * Before anything that can fail.
@@ -277,7 +279,15 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', async () => {
+app.on('before-quit', async (event) => {
+  if (antigravity.hasActiveSessions()) {
+    event.preventDefault()
+    isQuitting = true
+    for (const threadId of generatingThreads()) abortThread(threadId)
+    await antigravity.shutdown()
+    app.quit()
+    return
+  }
   isQuitting = true
   tray?.destroy()
   tray = null

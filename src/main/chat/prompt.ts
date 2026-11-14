@@ -210,12 +210,12 @@ export function assembleContext(
     }
   }
 
-  const useWeb = (provider === 'openrouter' || provider === 'codex') && webEnabledFor(thread, settings)
+  const useWeb = webEnabledFor(thread, settings)
   const nativeCodexWebSearch =
     provider === 'codex' && settings.codex.nativeWebSearch && useWeb
   const nativeSearchEnabled =
     nativeCodexWebSearch && !disabled.has('web') && !disabled.has('tools')
-  if (useWeb && (provider === 'codex' || settings.web.engine !== 'openrouter')) {
+  if (useWeb && (provider !== 'openrouter' || settings.web.engine !== 'openrouter')) {
     push({
       id: 'web',
       source: 'web',
@@ -265,7 +265,7 @@ export function assembleContext(
   // can be switched off here too.
   const candidateTools: ToolParam[] = [
     ...(available.length && onDemand ? [loadSkillTool(available)] : []),
-    ...(useWeb && !nativeCodexWebSearch && (provider === 'codex' || settings.web.engine !== 'openrouter')
+    ...(useWeb && !nativeCodexWebSearch && (provider !== 'openrouter' || settings.web.engine !== 'openrouter')
       ? [WEB_SEARCH_TOOL, WEB_FETCH_TOOL]
       : []),
     ...(repos.length ? REPO_TOOLS : []),
@@ -304,7 +304,6 @@ export function assembleContext(
    * below drops it, so this is genuinely the last thing the model reads.
    */
   if (
-    (provider === 'openrouter' || provider === 'codex') &&
     !settings.hideExperimental && settings.keyPointEnabled &&
     settings.keyPointSource === 'self'
   ) {

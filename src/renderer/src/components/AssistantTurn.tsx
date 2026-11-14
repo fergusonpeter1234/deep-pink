@@ -430,6 +430,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   const attributed = messages.find((m) => m.model) ?? first
   const usage = sumUsage(messages)
   const codexTurn = messages.some((message) => message.provider === 'Codex')
+  const antigravityTurn = messages.some((message) => message.provider === 'Antigravity')
   const chipSettings = ui.replyChips
   const streaming = messages.some((m) => m.status === 'streaming')
 
@@ -515,7 +516,7 @@ export const AssistantTurn = memo(function AssistantTurn({
         },
         {
           id: 'cost',
-          show: chipSettings.cost && (!codexTurn || usage.costUsd > 0),
+          show: chipSettings.cost && !antigravityTurn && (!codexTurn || usage.costUsd > 0),
           text: codexTurn
             ? `~${usage.costUsd < 0.01 ? `$${usage.costUsd.toFixed(6)}` : formatCost(usage.costUsd)}`
             : formatCost(usage.costUsd),

@@ -21,6 +21,11 @@ export const SETTINGS_PAGES: Record<SettingsTab, SettingsPage> = {
       'codex openai app server cli provider enable disable warning notice limitations experimental sign in login web search native built in',
     experimental: true
   },
+  antigravity: {
+    label: 'Antigravity',
+    keywords: 'antigravity gemini google agy cli provider login sign in enable disable restricted web notice',
+    experimental: true
+  },
   appearance: {
     label: 'Appearance',
     keywords: 'color colour accent font text size spacing width theme animation reply statistics'

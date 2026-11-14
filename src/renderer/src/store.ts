@@ -128,6 +128,7 @@ export type SettingsTab =
   | 'account'
   | 'models'
   | 'codex'
+  | 'antigravity'
   | 'prompts'
   | 'web'
   | 'webServer'
@@ -1629,10 +1630,11 @@ export const useStore = create<State>((set, get) => ({
 
   async saveSettings(patch) {
     const wasCodexEnabled = get().settings?.codex.enabled
+    const wasAntigravityEnabled = get().settings?.antigravity.enabled
     set({ settings: await api.settings.save(patch) })
     if (
-      patch.codex?.enabled !== undefined &&
-      patch.codex.enabled !== wasCodexEnabled
+      (patch.codex?.enabled !== undefined && patch.codex.enabled !== wasCodexEnabled) ||
+      (patch.antigravity?.enabled !== undefined && patch.antigravity.enabled !== wasAntigravityEnabled)
     ) {
       await get().refreshModels(true)
     }

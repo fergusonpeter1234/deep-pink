@@ -1,7 +1,7 @@
 {
   "name": "deep-pink",
   "version": "0.20.0",
-  "description": "Deep Pink — a local-first, open-source desktop AI chat app for OpenRouter and Codex",
+  "description": "Deep Pink — a local-first, open-source desktop AI chat app for OpenRouter, Codex and Antigravity",
   "main": "./out/main/index.js",
   "desktopName": "dev.deeppink.app.desktop",
   "author": "gokhanmergen",

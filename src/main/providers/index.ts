@@ -2,6 +2,7 @@ import { providerForModel } from '@shared/modelProviders'
 import type { ChatModel, ProviderStatus } from '@shared/types'
 import { loadSettings } from '../settings'
 import * as codex from './codex'
+import * as antigravity from './antigravity'
 import {
   complete as completeOpenRouter,
   knownModel as knownOpenRouterModel,
@@ -12,10 +13,11 @@ import type { ChatRequest, StreamHandlers, StreamResult } from './types'
 
 /** The catalog is composed here; each provider owns its discovery and transport. */
 export async function listModels(force = false): Promise<ChatModel[]> {
-  const codexEnabled = loadSettings().codex.enabled
-  const [openrouter, codexModels] = await Promise.allSettled([
+  const settings = loadSettings()
+  const [openrouter, codexModels, antigravityModels] = await Promise.allSettled([
     listOpenRouterModels(force),
-    codexEnabled ? codex.listModels(force) : Promise.resolve([])
+    settings.codex.enabled ? codex.listModels(force) : Promise.resolve([]),
+    settings.antigravity.enabled ? antigravity.listModels(force) : Promise.resolve([])
   ])
 
   const models: ChatModel[] = []
@@ -23,15 +25,19 @@ export async function listModels(force = false): Promise<ChatModel[]> {
     models.push(...openrouter.value.map((model) => ({ ...model, provider: 'openrouter' as const })))
   }
   if (codexModels.status === 'fulfilled') models.push(...codexModels.value)
+  if (antigravityModels.status === 'fulfilled') models.push(...antigravityModels.value)
 
   if (models.length) return models.sort((a, b) => a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id))
-  const errors = [openrouter, codexModels]
+  const errors = [openrouter, codexModels, antigravityModels]
     .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
     .map((result) => result.reason instanceof Error ? result.reason.message : String(result.reason))
   throw new Error(errors.join('\n'))
 }
 
 export function knownModel(id: string): ChatModel | null {
+  if (providerForModel(id) === 'antigravity') {
+    return loadSettings().antigravity.enabled ? antigravity.knownModel(id) : null
+  }
   if (providerForModel(id) === 'codex') {
     return loadSettings().codex.enabled ? codex.knownModel(id) : null
   }
@@ -40,10 +46,17 @@ export function knownModel(id: string): ChatModel | null {
 }
 
 export function providerStatus(): ProviderStatus {
-  return { codex: { ...codex.status(), enabled: loadSettings().codex.enabled } }
+  const settings = loadSettings()
+  return {
+    codex: { ...codex.status(), enabled: settings.codex.enabled },
+    antigravity: { ...antigravity.status(), enabled: settings.antigravity.enabled }
+  }
 }
 
 export function contextLimitFor(model: string): number | null {
+  if (providerForModel(model) === 'antigravity') {
+    return loadSettings().antigravity.enabled ? antigravity.contextLimitFor(model) : null
+  }
   if (providerForModel(model) === 'codex') {
     return loadSettings().codex.enabled ? codex.contextLimitFor(model) : null
   }
@@ -54,6 +67,10 @@ export async function streamChat(
   request: ChatRequest,
   handlers: StreamHandlers = {}
 ): Promise<StreamResult> {
+  if (providerForModel(request.model) === 'antigravity') {
+    if (!loadSettings().antigravity.enabled) throw new Error('The Antigravity provider is disabled. Enable it in Settings › Antigravity.')
+    return antigravity.streamChat(request, handlers)
+  }
   if (providerForModel(request.model) !== 'codex') return streamOpenRouterChat(request, handlers)
   if (!loadSettings().codex.enabled) {
     throw new Error(
@@ -64,6 +81,10 @@ export async function streamChat(
 }
 
 export async function complete(request: Omit<ChatRequest, 'tools'>): Promise<StreamResult> {
+  if (providerForModel(request.model) === 'antigravity') {
+    if (!loadSettings().antigravity.enabled) throw new Error('The Antigravity provider is disabled. Enable it in Settings › Antigravity.')
+    return antigravity.complete(request)
+  }
   if (providerForModel(request.model) !== 'codex') return completeOpenRouter(request)
   if (!loadSettings().codex.enabled) {
     throw new Error(

@@ -32,6 +32,7 @@ import * as engine from './chat/engine'
 import { assembleContext } from './chat/prompt'
 import { getCredits, listEndpoints } from './providers/openrouter'
 import { listModels, providerStatus } from './providers'
+import { providerForModel } from '@shared/modelProviders'
 import { askKeyPoint, askKeyPointViaModel } from './providers/typesafe'
 import { keyPointCeiling } from '@shared/defaults'
 import { loadSettings, saveSettings } from './settings'
@@ -205,7 +206,7 @@ export function registerIpc(): void {
   ipcMain.handle('models:list', (_e, force = false) => listModels(force))
   ipcMain.handle('models:providerStatus', () => providerStatus())
   ipcMain.handle('models:endpoints', (_e, modelId: string, force = false) =>
-    listEndpoints(modelId, force)
+    providerForModel(modelId) === 'openrouter' ? listEndpoints(modelId, force) : []
   )
 
   /* ---------------- threads ---------------- */

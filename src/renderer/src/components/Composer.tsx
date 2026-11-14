@@ -117,6 +117,9 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
   const compareHasCodexModel = useStore(
     (s) => s.compare?.some((pane) => providerForModel(pane.model) === 'codex') ?? false
   )
+  const compareHasAntigravityModel = useStore(
+    (s) => s.compare?.some((pane) => providerForModel(pane.model) === 'antigravity') ?? false
+  )
   const setOverlay = useStore((s) => s.setOverlay)
   const openSettings = useStore((s) => s.openSettings)
 
@@ -146,6 +149,9 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
     target && !target.threadId ? null : (thread?.config.model ?? settings?.defaultModel)
   const isCodexModel = providerForModel(activeModel) === 'codex' ||
     Boolean(target && !target.threadId && compareHasCodexModel)
+  const isAntigravityModel = providerForModel(activeModel) === 'antigravity' ||
+    Boolean(target && !target.threadId && compareHasAntigravityModel)
+  const isLocalModel = isCodexModel || isAntigravityModel
   const hideExperimental = settings?.hideExperimental ?? true
   const webOn = config?.webAccessEnabled ?? settings?.web.enabled ?? false
   const chartsOn = !hideExperimental && (config?.chartsEnabled ?? settings?.chartsEnabled ?? false)
@@ -258,7 +264,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
   const repoPaths = config?.repoPaths ?? []
 
   useEffect(() => {
-    if (!repoPaths.length || isCodexModel) {
+    if (!repoPaths.length || isLocalModel) {
       setRepos([])
       return
     }
@@ -269,7 +275,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
     return () => {
       cancelled = true
     }
-  }, [repoPaths.join('|'), isCodexModel])
+  }, [repoPaths.join('|'), isLocalModel])
 
   const attachRepo = async (): Promise<void> => {
     const path = await window.deepPink.repo.choose()
@@ -294,7 +300,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
       icon: <ImageIcon {...ICON} />,
       onSelect: () => fileInputRef.current?.click()
     },
-    ...(hideExperimental || isCodexModel ? [] : [{
+    ...(hideExperimental || isLocalModel ? [] : [{
       id: 'repo',
       label: 'Code repository…',
       icon: <FolderCode {...ICON} />,
@@ -316,7 +322,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
   // Reading a codebase means reading text the model treats as instructions. If
   // the same thread can also reach the network, anything hidden in that text has
   // a way out. Worth saying plainly rather than quietly forbidding.
-  const repoAndWeb = !isCodexModel && repos.length > 0 && webOn
+  const repoAndWeb = !isLocalModel && repos.length > 0 && webOn
 
   const pasteThreshold = settings?.ui.pasteAsFileThreshold ?? 2000
 
@@ -431,12 +437,12 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
       label:
         mode === 'budget'
           ? `${REASONING_LABELS[mode]} (${reasoning.budgetTokens.toLocaleString()})`
-          : mode === 'off' && isCodexModel ? 'Minimum' : REASONING_LABELS[mode],
+          : mode === 'off' && isLocalModel ? 'Minimum' : REASONING_LABELS[mode],
       on: reasoning.mode === mode,
       hint: mode === 'auto'
         ? 'the model decides'
-        : mode === 'off' && isCodexModel
-          ? 'Codex always reasons; this uses its lowest supported effort'
+        : mode === 'off' && isLocalModel
+          ? 'Uses the lowest reasoning effort supported by the local provider'
           : undefined,
       onSelect: () => {
         writeConfig({ reasoning: { ...reasoning, mode } })
@@ -470,6 +476,16 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
             supported when experimental features are shown.
             Codex always reasons; “None” uses its lowest supported effort. Click to open Codex
             settings.
+          </button>
+        )}
+        {isAntigravityModel && !settings?.antigravity.hideChatNotice && (
+          <button className="composer__notice composer__notice--action" type="button"
+            aria-label="Open Antigravity settings to hide this notice" onClick={() => openSettings('antigravity')}>
+            Antigravity uses the local CLI with your Google sign-in and an isolated temporary profile.
+            Shell, local file tools, computer control, delegation, personal MCP servers and plugins are unavailable.
+            Web access exposes only Deep Pink’s search and page-reading tools.
+            Temperature and output-token limits are managed by Antigravity; billing cost is unavailable.
+            Click to open Antigravity settings.
           </button>
         )}
         {toolsUnsupported && (
@@ -510,7 +526,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
             void add(files)
           }}
         >
-          {!isCodexModel && repos.length > 0 && (
+          {!isLocalModel && repos.length > 0 && (
             <div className="repos">
               {repos.map((repo) => (
                 <div
@@ -632,7 +648,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
                 const r = event.currentTarget.getBoundingClientRect()
                 setAttachMenu({ x: Math.round(r.left), y: Math.round(r.top) })
               }}
-              title={isCodexModel ? 'Attach images or text files' : 'Attach images, text files, or a code repository'}
+              title={isLocalModel ? 'Attach images or text files' : 'Attach images, text files, or a code repository'}
               type="button"
               disabled={!configurable}
             >
@@ -671,7 +687,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
               >
                 <Brain {...ICON} />
                 <span className="btn__label">
-                  {isCodexModel && reasoning.mode === 'off' ? 'Minimum' : shortReasoningLabel(reasoning)}
+                  {isLocalModel && reasoning.mode === 'off' ? 'Minimum' : shortReasoningLabel(reasoning)}
                 </span>
               </button>
             )}

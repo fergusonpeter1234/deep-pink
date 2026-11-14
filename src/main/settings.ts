@@ -34,6 +34,7 @@ function alreadyExperimenting(stored: Partial<Settings>): boolean {
     stored.keyPointEnabled ||
     stored.web?.enabled ||
     stored.webServer?.enabled ||
+    stored.antigravity?.enabled ||
     stored.sendAppAttribution === false
   )
 }
@@ -87,6 +88,10 @@ export function loadSettings(): Settings {
       ...DEFAULT_SETTINGS.codex,
       ...stored.codex
     },
+    antigravity: {
+      ...DEFAULT_SETTINGS.antigravity,
+      ...stored.antigravity
+    },
     webServer: webServerSettings(stored.webServer),
     compaction: normalizeCompaction(stored.compaction ?? {}),
     ui: {
@@ -127,6 +132,10 @@ export function saveSettings(input: SettingsPatch): Settings {
     codex: {
       ...current.codex,
       ...patch.codex
+    },
+    antigravity: {
+      ...current.antigravity,
+      ...patch.antigravity
     },
     webServer: webServerSettings({ ...current.webServer, ...patch.webServer }),
     compaction: normalizeCompaction({

@@ -28,6 +28,7 @@ const asked = new Map<string, Promise<string | null>>()
 function authorOf(modelId: string): string {
   const nativeId = providerModelId(modelId)
   if (modelId.startsWith('codex:')) return 'openai'
+  if (modelId.startsWith('antigravity:')) return 'google'
   const slash = nativeId.indexOf('/')
   return (slash === -1 ? nativeId : nativeId.slice(0, slash)).toLowerCase()
 }
@@ -37,7 +38,7 @@ function iconFor(modelId: string): Promise<string | null> {
   let pending = asked.get(author)
   if (!pending) {
     const nativeId = providerModelId(modelId)
-    pending = window.deepPink.icons.author(modelId.startsWith('codex:') ? `openai/${nativeId}` : modelId)
+    pending = window.deepPink.icons.author(modelId.startsWith('codex:') ? `openai/${nativeId}` : modelId.startsWith('antigravity:') ? `google/${nativeId}` : modelId)
     asked.set(author, pending)
   }
   return pending

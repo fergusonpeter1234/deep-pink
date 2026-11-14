@@ -96,6 +96,7 @@ const TAB_GROUPS: { title?: string; tabs: TabDef[] }[] = [
     title: 'Experimental',
     tabs: [
       pageTab('codex', <Terminal {...ICON} />),
+      pageTab('antigravity', <Terminal {...ICON} />),
       pageTab('webServer', <Globe {...ICON} />),
       pageTab('skills', <Sparkles {...ICON} />),
       pageTab('keyPoint', <Highlighter {...ICON} />),
@@ -568,6 +569,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
   const hidden =
     (settings?.hideExperimental ?? true) &&
     asked !== 'codex' &&
+    asked !== 'antigravity' &&
     TAB_GROUPS.some((g) => g.tabs.some((t) => t.id === asked && t.experimental))
   const tab: Tab = hidden ? 'general' : asked
   const [query, setQuery] = useState('')
@@ -2086,6 +2088,33 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
                 }
               />
               <span>Use Codex’s native web search</span>
+            </label>
+          </SettingsSection>
+
+          <SettingsSection
+            page="antigravity"
+            activePage={tab}
+            query={query}
+            sectionId="settings-antigravity-0"
+            keywords="antigravity google gemini agy cli login sign in restricted provider"
+          >
+            <h3 className="section-title">Antigravity provider <Experimental /></h3>
+            <p className="field__hint">
+              Install Antigravity CLI 1.5.8 or a later 1.5.x release and sign in with <code>agy</code> in a terminal.
+              Deep Pink uses an isolated temporary profile and removes file, shell, computer-control and delegation tools.
+              Web access uses only Deep Pink’s search and page-reading tools through a private bridge.
+              Your personal Antigravity MCP servers, plugins and workspace instructions are not loaded.
+              Temperature and output-token limits are managed by Antigravity. Token counts are shown; billing cost is unavailable.
+            </p>
+            <label className="switch">
+              <input type="checkbox" checked={settings.antigravity.enabled}
+                onChange={(event) => void saveSettings({ antigravity: { enabled: event.target.checked } })} />
+              <span>Enable the Antigravity provider</span>
+            </label>
+            <label className="switch">
+              <input type="checkbox" checked={!settings.antigravity.hideChatNotice}
+                onChange={(event) => void saveSettings({ antigravity: { hideChatNotice: !event.target.checked } })} />
+              <span>Show the notice in Antigravity chats</span>
             </label>
           </SettingsSection>
 

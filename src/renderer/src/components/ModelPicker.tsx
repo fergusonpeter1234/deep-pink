@@ -128,6 +128,7 @@ export function ModelPicker({ mode, onClose }: Props): React.JSX.Element {
       .filter((m) => !toolsOnly || m.supportsTools)
       .filter((m) => !drawsOnly || m.outputModalities.includes('image'))
       .filter((m) => m.provider !== 'codex' || settings?.codex.enabled !== false)
+      .filter((m) => m.provider !== 'antigravity' || settings?.antigravity.enabled === true)
       .filter(
         (m) =>
           mode !== 'webServer' ||
@@ -135,7 +136,7 @@ export function ModelPicker({ mode, onClose }: Props): React.JSX.Element {
       )
       .filter((m) => matchesQuery(m, words))
       .slice(0, 300)
-  }, [models, settings?.codex.enabled, query, toolsOnly, drawsOnly, mode])
+  }, [models, settings?.codex.enabled, settings?.antigravity.enabled, query, toolsOnly, drawsOnly, mode])
 
   useEffect(() => setCursor(0), [query, toolsOnly, drawsOnly])
 
@@ -267,6 +268,12 @@ export function ModelPicker({ mode, onClose }: Props): React.JSX.Element {
                     : 'Codex unavailable'}
             </span>
           )}
+          {providers?.antigravity.enabled && (
+            <span className="chip" title={providers.antigravity.error ?? (providers.antigravity.available
+              ? 'Using the Antigravity CLI signed in on this desktop' : 'Install Antigravity CLI 1.5.8 or a later 1.5.x release')}>
+              {providers.antigravity.error ? 'Antigravity needs attention' : providers.antigravity.available ? 'Antigravity ready' : 'Antigravity unavailable'}
+            </span>
+          )}
           <button
             className="btn btn--ghost"
             onClick={() => {
@@ -285,7 +292,7 @@ export function ModelPicker({ mode, onClose }: Props): React.JSX.Element {
         {filtered.length === 0 && (
           <div className="empty" style={{ height: 160 }}>
             {models.length === 0
-              ? 'No models loaded. Check your OpenRouter connection or Codex CLI sign-in, then refresh.'
+              ? 'No models loaded. Check your OpenRouter connection or local CLI sign-in, then refresh.'
               : 'No models match that search.'}
           </div>
         )}
@@ -315,7 +322,7 @@ export function ModelPicker({ mode, onClose }: Props): React.JSX.Element {
               <span className="cmditem__sub">{model.id}</span>
             </span>
             <span className="row" style={{ gap: 6, flex: 'none' }}>
-              <span className="chip">{model.provider === 'codex' ? 'Codex' : 'OpenRouter'}</span>
+              <span className="chip">{model.provider === 'codex' ? 'Codex' : model.provider === 'antigravity' ? 'Antigravity' : 'OpenRouter'}</span>
               {model.supportsTools && <span className="chip">tools</span>}
               {model.supportsReasoning && <span className="chip">reasoning</span>}
               {model.outputModalities.includes('image') && (

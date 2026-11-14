@@ -105,17 +105,17 @@ export function buildActions(): AppAction[] {
   const store = useStore.getState()
   const { activeThreadId, threads, settings } = store
   const thread = threads.find((t) => t.id === activeThreadId) ?? null
-  const codexSelected = store.compare
+  const localProviderSelected = store.compare
     ? store.compare.some((pane) => {
         const selected = pane.threadId
           ? threads.find((item) => item.id === pane.threadId)?.config.model ?? pane.model
           : pane.model ?? settings?.defaultModel
-        return providerForModel(selected) === 'codex'
+        return providerForModel(selected) !== 'openrouter'
       })
-    : providerForModel(thread?.config.model ?? settings?.defaultModel) === 'codex'
-  const codexUnavailable = (): boolean => {
-    if (!codexSelected) return false
-    store.showToast('This capability is unavailable with Codex models')
+    : providerForModel(thread?.config.model ?? settings?.defaultModel) !== 'openrouter'
+  const localProviderUnavailable = (): boolean => {
+    if (!localProviderSelected) return false
+    store.showToast('This capability is unavailable with local CLI models')
     return true
   }
 
@@ -559,9 +559,9 @@ export function buildActions(): AppAction[] {
       id: 'provider.picker',
       label: 'Choose the provider for this model',
       group: 'Model',
-      hidden: codexSelected,
+      hidden: localProviderSelected,
       run: () => {
-        if (codexUnavailable()) return
+        if (localProviderUnavailable()) return
         return openThreadOnly(() => store.setOverlay('providers'))()
       }
     },

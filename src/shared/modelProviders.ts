@@ -3,17 +3,21 @@ import type { ChatModel } from './types'
 export type ChatProvider = ChatModel['provider']
 
 const CODEX_PREFIX = 'codex:'
+const ANTIGRAVITY_PREFIX = 'antigravity:'
 
 /** OpenRouter model ids are kept as-is for existing settings and thread data. */
 export function providerForModel(model: string | null | undefined): ChatProvider {
-  return model?.startsWith(CODEX_PREFIX) ? 'codex' : 'openrouter'
+  if (model?.startsWith(CODEX_PREFIX)) return 'codex'
+  if (model?.startsWith(ANTIGRAVITY_PREFIX)) return 'antigravity'
+  return 'openrouter'
 }
 
 /** The id stored in settings and threads is namespaced to avoid provider collisions. */
 export function modelIdForProvider(provider: ChatProvider, id: string): string {
-  return provider === 'codex' ? `${CODEX_PREFIX}${id}` : id
+  return provider === 'openrouter' ? id : `${provider}:${id}`
 }
 
 export function providerModelId(model: string): string {
-  return providerForModel(model) === 'codex' ? model.slice(CODEX_PREFIX.length) : model
+  const provider = providerForModel(model)
+  return provider === 'openrouter' ? model : model.slice(provider.length + 1)
 }

@@ -503,7 +503,7 @@ export async function shouldCompact(
   if (!settings.compaction.enabled || !limit) return { needed: false, used, limit }
   const compaction = normalizeCompaction(settings.compaction)
   // A request must also leave room for the configured answer.
-  const output = providerForModel(model) === 'codex'
+  const output = providerForModel(model) !== 'openrouter'
     ? 0
     : (thread.config.maxTokens ?? settings.maxTokens ?? 0)
   const reserved = Number.isFinite(output) ? Math.max(0, output) : 0
@@ -828,7 +828,7 @@ export async function pregenerateTitle(threadId: string, prompt: string, emit: E
   if (!thread || thread.title || thread.temporary) return
 
   const threadModel = thread.config.model ?? settings.defaultModel
-  const model = providerForModel(threadModel) === 'codex'
+  const model = providerForModel(threadModel) !== 'openrouter'
     ? threadModel
     : (settings.titlePregenModel || settings.titleModel)
 
@@ -969,7 +969,7 @@ export async function generateTitle(threadId: string, emit: Emit): Promise<strin
   const thread = repo.getThread(threadId)
   if (!thread) return null
   const threadModel = thread.config.model ?? settings.defaultModel
-  const model = providerForModel(threadModel) === 'codex' ? threadModel : settings.titleModel
+  const model = providerForModel(threadModel) !== 'openrouter' ? threadModel : settings.titleModel
   /*
    * Someone is already asking. Say nothing and let them answer.
    *
@@ -1215,13 +1215,13 @@ export async function sendMessage(req: SendMessageRequest, emit: Emit): Promise<
               emit({ type: 'reasoning', messageId: assistant.id, delta })
             },
             onImage: (dataUrl) => void keepImage(req.threadId, assistant.id, dataUrl, emit),
-            onDynamicToolCall: provider === 'codex'
+            onDynamicToolCall: provider !== 'openrouter'
               ? async (call) => {
                   const allowed = context.tools.some((tool) => tool.function.name === call.name) &&
                     (call.name === 'web_search' || call.name === 'web_fetch')
-                  if (!allowed) throw new Error('Codex requested a web tool that is not enabled for this chat.')
+                  if (!allowed) throw new Error('The local provider requested a web tool that is not enabled for this chat.')
                   if (codexToolCalls.length >= MAX_TOOL_ROUNDS) {
-                    throw new Error(`Codex reached the ${MAX_TOOL_ROUNDS}-call web search limit for one reply.`)
+                    throw new Error(`The local provider reached the ${MAX_TOOL_ROUNDS}-call web search limit for one reply.`)
                   }
 
                   codexToolCalls.push(call)
