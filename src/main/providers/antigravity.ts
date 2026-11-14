@@ -444,7 +444,7 @@ export async function streamChat(request: ChatRequest, handlers: StreamHandlers 
         firstTokenAt ??= Date.now()
         content += chunk.text
         handlers.onContent?.(chunk.text)
-      } else if (update.sessionUpdate === 'agent_thought_chunk' && typeof chunk.text === 'string' && request.reasoning?.exclude !== true) {
+      } else if (update.sessionUpdate === 'agent_thought_chunk' && typeof chunk.text === 'string' && request.includeReasoning !== false && request.reasoning?.exclude !== true) {
         reasoningStartedAt ??= Date.now()
         reasoning += chunk.text
         handlers.onReasoning?.(chunk.text)
@@ -490,4 +490,4 @@ export async function streamChat(request: ChatRequest, handlers: StreamHandlers 
   return { content, reasoning, images: [], citations: [], toolCalls: calls, toolCallsHandled: true, finishReason: 'stop', provider: 'Antigravity', usage }
 }
 
-export function complete(request: Omit<ChatRequest, 'tools'>): Promise<StreamResult> { return streamChat(request) }
+export function complete(request: Omit<ChatRequest, 'tools'>): Promise<StreamResult> { return streamChat({ ...request, includeReasoning: false }) }

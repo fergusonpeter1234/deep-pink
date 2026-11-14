@@ -35,6 +35,7 @@ import {
 } from '@shared/reasoning'
 
 export const COMPOSER_ID = 'composer-input'
+const EMPTY_FILES: StagedFile[] = []
 
 /**
  * Where what is typed goes, when it is not the open thread.
@@ -84,7 +85,6 @@ interface ComposerProps {
 }
 
 export function Composer({ compact = false, onInteract, target }: ComposerProps): React.JSX.Element {
-  const [images, setImages] = useState<StagedFile[]>([])
   const [dragging, setDragging] = useState(false)
   const [attachMenu, setAttachMenu] = useState<{ x: number; y: number } | null>(null)
   const [extraMenu, setExtraMenu] = useState<{ x: number; y: number } | null>(null)
@@ -109,6 +109,11 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
    */
   const activeThreadId = target ? target.threadId : openThreadId
   const draftKey = target ? target.draftKey : openThreadId
+  const images = useStore((s) => (draftKey ? s.draftAttachments[draftKey] : undefined)) ?? EMPTY_FILES
+  const updateAttachments = useStore((s) => s.setDraftAttachments)
+  const setImages = useCallback((update: StagedFile[] | ((current: StagedFile[]) => StagedFile[])) => {
+    if (draftKey) updateAttachments(draftKey, typeof update === 'function' ? update : () => update)
+  }, [draftKey, updateAttachments])
   const generating = target ? target.generating : openGenerating || compacting
   const value = useStore((s) => (draftKey ? (s.drafts[draftKey] ?? '') : ''))
   const setDraft = useStore((s) => s.setDraft)
@@ -219,7 +224,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
     const { staged, rejected } = await stageFiles(files, images.length)
     if (staged.length) setImages((current) => [...current, ...staged])
     if (rejected.length) showToast(rejected[0], 'error')
-  }, [images.length, showToast])
+  }, [images.length, showToast, setImages])
 
   // Images can be pasted while the transcript or another non-editable part of
   // the window has focus. Treat that like pasting into the composer, then leave
@@ -264,7 +269,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
   const repoPaths = config?.repoPaths ?? []
 
   useEffect(() => {
-    if (!repoPaths.length || isLocalModel) {
+    if (!repoPaths.length || isAntigravityModel) {
       setRepos([])
       return
     }
@@ -275,7 +280,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
     return () => {
       cancelled = true
     }
-  }, [repoPaths.join('|'), isLocalModel])
+  }, [repoPaths.join('|'), isAntigravityModel])
 
   const attachRepo = async (): Promise<void> => {
     const path = await window.deepPink.repo.choose()
@@ -300,7 +305,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
       icon: <ImageIcon {...ICON} />,
       onSelect: () => fileInputRef.current?.click()
     },
-    ...(hideExperimental || isLocalModel ? [] : [{
+    ...(hideExperimental || isAntigravityModel ? [] : [{
       id: 'repo',
       label: 'Code repository…',
       icon: <FolderCode {...ICON} />,
@@ -322,7 +327,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
   // Reading a codebase means reading text the model treats as instructions. If
   // the same thread can also reach the network, anything hidden in that text has
   // a way out. Worth saying plainly rather than quietly forbidding.
-  const repoAndWeb = !isLocalModel && repos.length > 0 && webOn
+  const repoAndWeb = !isAntigravityModel && repos.length > 0 && webOn
 
   const pasteThreshold = settings?.ui.pasteAsFileThreshold ?? 2000
 
@@ -469,13 +474,10 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
             onClick={() => openSettings('codex')}
             type="button"
           >
-            Codex uses the local Codex App Server. When enabled, Web access allows only search and
-            page reading.
-            Shell, local file access, computer control, repository tools, MCP, plugins, and
-            OpenRouter provider routing are unavailable. Charts and prompt-based skills are
-            supported when experimental features are shown.
-            Codex always reasons; “None” uses its lowest supported effort. Click to open Codex
-            settings.
+            Codex supports web search, attached repositories, MCP tools, charts, and skills through
+            Deep Pink. Shell and computer control are disabled. Image generation and OpenRouter
+            routing are unavailable; temperature and output token limits are not supported by Codex.
+            “None” uses the model’s lowest reasoning effort. Click to open Codex settings.
           </button>
         )}
         {isAntigravityModel && !settings?.antigravity.hideChatNotice && (
@@ -526,7 +528,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
             void add(files)
           }}
         >
-          {!isLocalModel && repos.length > 0 && (
+          {!isAntigravityModel && repos.length > 0 && (
             <div className="repos">
               {repos.map((repo) => (
                 <div
@@ -648,7 +650,7 @@ export function Composer({ compact = false, onInteract, target }: ComposerProps)
                 const r = event.currentTarget.getBoundingClientRect()
                 setAttachMenu({ x: Math.round(r.left), y: Math.round(r.top) })
               }}
-              title={isLocalModel ? 'Attach images or text files' : 'Attach images, text files, or a code repository'}
+              title={isAntigravityModel ? 'Attach images or text files' : 'Attach images, text files, or a code repository'}
               type="button"
               disabled={!configurable}
             >

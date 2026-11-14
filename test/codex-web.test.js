@@ -125,7 +125,7 @@ suite('Codex web tool runtime', async ({ check, subject }) => {
           launchArgs.includes('web_search="live"') && enabled('standalone_web_search'))
         check('native turn allows the wrapper without registering fallback tools',
           !threadParams.dynamicTools &&
-          threadParams.developerInstructions.includes('code-mode JavaScript wrapper'))
+          threadParams.baseInstructions.includes('code-mode JavaScript wrapper'))
       }
     }
   } finally {

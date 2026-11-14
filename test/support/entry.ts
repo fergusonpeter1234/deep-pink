@@ -18,3 +18,6 @@ export {
 } from '@/providers/antigravity'
 export { createWebBridge, WEB_BRIDGE_SCRIPT, webArguments, webToolsFor } from '@/providers/antigravityBridge'
 export { providerForModel, modelIdForProvider, providerModelId } from '@shared/modelProviders'
+export { linkContextMenuItems, registerLinkContextMenu } from '@/linkContextMenu'
+export * as codex from '@/providers/codex'
+export { liftProviderTools } from '../../src/renderer/src/turns'

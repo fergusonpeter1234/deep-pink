@@ -103,6 +103,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
         const notification = (update) => emit({ method: 'session/update', params: { sessionId: 'test-session', update } })
         let turnId
         const complete = () => {
+          notification({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Thinking.' } })
           notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Restricted response.' } })
           emit({ id: turnId, result: { stopReason: 'end_turn', usage: { inputTokens: 11, outputTokens: 3, totalTokens: 14 } } })
         }
@@ -160,6 +161,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
       try {
         result = await streamAntigravityChat({
           model: 'antigravity:gemini-test', attribution: false, signal: controller.signal,
+          includeReasoning: scenario !== 'plain',
           messages: [{ role: 'system', content: 'Be concise.' }, { role: 'user', content: scenario === 'images'
             ? [{ type: 'text', text: 'Describe this.' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,dGVzdA==' } }]
             : '/browser test' }],
@@ -179,6 +181,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
       if (scenario === 'plain') {
         check('transcript wrapping prevents slash-command expansion', prompt[0].text.startsWith('Conversation transcript'))
         check('reported token counts are retained', result.usage.totalTokens === 14)
+        check('reasoning visibility preference is respected', result.reasoning === '')
       }
       if (scenario === 'images') check('image bytes are sent directly through ACP',
         prompt[1]?.type === 'image' && prompt[1]?.mimeType === 'image/png' && prompt[1]?.data === 'dGVzdA==')

@@ -12,6 +12,7 @@ import { reportUncaught } from './report'
 import * as webServer from './webServer'
 import * as antigravity from './providers/antigravity'
 import { abortThread, generatingThreads } from './chat/engine'
+import { registerLinkContextMenu } from './linkContextMenu'
 
 /*
  * Before anything that can fail.
@@ -113,6 +114,7 @@ function createWindow(): BrowserWindow {
     }
   })
   mainWindow = win
+  registerLinkContextMenu(win)
 
   win.on('close', (event) => {
     if (isQuitting || !keepInTray()) return

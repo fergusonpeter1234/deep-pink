@@ -3,7 +3,7 @@
 Deep Pink can use Gemini through the locally installed Antigravity CLI and its cached Google sign-in. This is an experimental provider, disabled by default. It does not require an OpenRouter API key.
 
 1. Install Antigravity CLI and sign in by running `agy` in a terminal.
-2. Show experimental features in Deep Pink, then open Settings → Antigravity.
+2. Show experimental features in Deep Pink, then open Settings → Connections → Antigravity.
 3. Enable the provider and refresh the model picker. Select a model labeled Antigravity.
 
 The current integration accepts CLI 1.5.8 and later patches in the 1.5 series. Unknown series are rejected because the tool restrictions have not been verified for them. A newer series needs validation and an integration update before it is accepted. Deep Pink discovers Gemini models and thinking levels from ACP session options; unsupported third-party models are not advertised.
