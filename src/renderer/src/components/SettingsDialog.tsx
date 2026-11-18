@@ -2115,7 +2115,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.
               <FieldLabel path="antigravity.webToolLimit" what="the Antigravity web research budget">
                 Web research budget per reply
               </FieldLabel>
-              <select id="setting-antigravity-webToolLimit" value={settings.antigravity.webToolLimit}
+              <select id="setting-antigravity-webToolLimit" className="select" value={settings.antigravity.webToolLimit}
                 onChange={(event) => void saveSettings({ antigravity: { webToolLimit: Number(event.target.value) } })}>
                 {![4, 8, 12].includes(settings.antigravity.webToolLimit) && (
                   <option value={settings.antigravity.webToolLimit}>{settings.antigravity.webToolLimit} searches or page reads</option>
