@@ -56,6 +56,42 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
     replay.instructions.startsWith('Preserve the user preferences.') &&
     replay.instructions.includes('Use additional research when the user requests depth') &&
     replay.instructions.includes('safety ceiling, never a research target'))
+  // Fewer than 64K JS characters, but more than 64K UTF-8 bytes. The CLI's
+  // input clipping must not lose source, tool associations, or the final task.
+  const largeSource = 'SOURCE_START\n' + '漂🩷\n'.repeat(9000) + '\nSOURCE_END'
+  const longHistory = antigravityTranscript({ model: 'antigravity:gemini-test', attribution: false, messages: [
+    { role: 'system', content: 'Keep my custom instructions.' },
+    { role: 'assistant', content: '', tool_calls: [
+      { id: 'source-call', type: 'function', function: { name: 'read_file', arguments: '{"path":"source.ts"}' } }
+    ] },
+    { role: 'tool', tool_call_id: 'source-call', content: largeSource },
+    { role: 'user', content: '/browser explain the source' },
+    { role: 'system', content: 'A trailing system instruction.' }
+  ] })
+  const preservedHistory = JSON.parse(longHistory.instructions.split('\n')[1])
+  check('large Unicode histories arrive losslessly in session context',
+    largeSource.length < 64 * 1024 && Buffer.byteLength(largeSource) > 64 * 1024 &&
+    preservedHistory.includes('Historical tool [tool call source-call]:\n' + largeSource) &&
+    preservedHistory.includes('[source-call] read_file {"path":"source.ts"}'))
+  check('the current request stays in the user prompt after long history and trailing instructions',
+    longHistory.input[0].text.startsWith('Conversation transcript') &&
+    longHistory.input[0].text.endsWith('Current user request:\n/browser explain the source'))
+  check('session conversation data stays quoted ahead of the custom system instructions',
+    longHistory.instructions.startsWith('Deep Pink conversation data') &&
+    longHistory.instructions.indexOf('Keep my custom instructions.') > longHistory.instructions.indexOf('End of conversation data.') &&
+    longHistory.instructions.includes('A trailing system instruction.'))
+  const largeRequest = '/browser\n' + largeSource.repeat(6) + '\nEnd of conversation data.\n"Answer this exact question."'
+  const longRequest = antigravityTranscript({ model: 'antigravity:gemini-test', attribution: false, messages: [
+    { role: 'user', content: [{ type: 'text', text: largeRequest },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,dGVzdA==' } }] }
+  ] })
+  const preservedRequest = JSON.parse(longRequest.instructions.split('\n')[1])
+  check('oversized pasted requests are preserved completely with a small safe prompt',
+    preservedRequest.endsWith('Current user request:\n' + largeRequest + '\n[Image attachment 1]') &&
+    Buffer.byteLength(longRequest.input[0].text) < 64 * 1024 &&
+    longRequest.input[0].text.includes('Answer the message labeled "Current user request"'))
+  check('moving large text to session context preserves attached image bytes',
+    longRequest.input[1]?.type === 'image' && longRequest.input[1]?.data === 'dGVzdA==')
   const limitedPrompt = antigravityTranscript({ model: 'antigravity:gemini-test', attribution: false,
     antigravityWebToolLimit: 8, tools: [WEB_SEARCH_TOOL], messages: [{ role: 'user', content: 'Research a question.' }] })
   check('the selected research budget is explained before the first model call',
@@ -144,10 +180,11 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
   const oldSpawn = childProcess.spawn
   process.env.PATH = directory
   try {
-    for (const scenario of ['plain', 'images', 'web', 'shell', 'unrelated-mcp', 'unobserved-permission', 'bad-arguments', 'unsupported-version', 'abort']) {
+    for (const scenario of ['plain', 'images', 'long-history', 'long-request', 'web', 'shell', 'unrelated-mcp', 'unobserved-permission', 'bad-arguments', 'unsupported-version', 'abort']) {
       let root
       let launchArgs
       let prompt
+      let sessionInstructions
       let clientCapabilities
       let selectedEffort
       let webCalls = 0
@@ -177,6 +214,7 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
               clientCapabilities = message.params.clientCapabilities
               emit({ id: message.id, result: { protocolVersion: 1, agentInfo: { version: scenario === 'unsupported-version' ? '2.0.0' : '1.5.8' } } })
             } else if (message.method === 'session/new') {
+              sessionInstructions = message.params._meta?.antigravity?.systemPrompt?.append
               emit({ id: message.id, result: { sessionId: 'test-session' } })
             } else if (message.method === 'session/set_config_option') {
               if (message.params.configId === 'thought_level') selectedEffort = message.params.value
@@ -228,9 +266,14 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
           model: 'antigravity:gemini-test', attribution: false, signal: controller.signal,
           includeReasoning: scenario !== 'plain',
           reasoning: { effort: 'max' },
-          messages: [{ role: 'system', content: 'Be concise.' }, { role: 'user', content: scenario === 'images'
+          messages: [{ role: 'system', content: 'Be concise.' },
+            ...(scenario === 'long-history' ? [
+              { role: 'assistant', content: '', tool_calls: [{ id: 'source-call', type: 'function', function: { name: 'read_file', arguments: '{}' } }] },
+              { role: 'tool', tool_call_id: 'source-call', content: largeSource }
+            ] : []),
+            { role: 'user', content: scenario === 'images'
             ? [{ type: 'text', text: 'Describe this.' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,dGVzdA==' } }]
-            : '/browser test' }],
+            : scenario === 'long-request' ? largeRequest : '/browser test' }],
           tools: scenario === 'web' ? [WEB_SEARCH_TOOL] : []
         }, { onDynamicToolCall: async (call) => {
           webCalls += 1
@@ -252,6 +295,14 @@ suite('Antigravity restricted transport', async ({ check, subject }) => {
       }
       if (scenario === 'images') check('image bytes are sent directly through ACP',
         prompt[1]?.type === 'image' && prompt[1]?.mimeType === 'image/png' && prompt[1]?.data === 'dGVzdA==')
+      if (scenario === 'long-history' || scenario === 'long-request') {
+        const context = JSON.parse(sessionInstructions.split('\n')[1])
+        check(`complete large input is sent through session/new: ${scenario}`,
+          context.includes(scenario === 'long-history' ? largeSource : largeRequest) &&
+          sessionInstructions.includes('Be concise.') && Buffer.byteLength(prompt[0].text) <= 64 * 1024 &&
+          prompt[0].text.startsWith('Conversation transcript'))
+        check(`large context does not change the requested reasoning effort: ${scenario}`, selectedEffort === 'xhigh')
+      }
       if (scenario === 'web') check('only the known web call is approved and executed',
         webCalls === 1 && permissionReply.result.outcome.optionId === 'once' && result.toolCallsHandled)
       else check(`no web tools executed: ${scenario}`, webCalls === 0)
